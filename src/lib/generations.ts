@@ -213,9 +213,33 @@ export async function listGenerations(
   };
 }
 
+/**
+ * Turn a provider error into something worth showing a user.
+ *
+ * fal's ApiError carries the useful sentence in `body.detail` while `message`
+ * is just the HTTP reason — a failed card that says "Forbidden" tells nobody
+ * anything, where "Exhausted balance. Top up..." is actionable.
+ */
 function describeError(error: unknown): string {
-  if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
+
+  if (error && typeof error === "object") {
+    const body = (error as { body?: unknown }).body;
+    if (body && typeof body === "object") {
+      const detail = (body as { detail?: unknown }).detail;
+      if (typeof detail === "string" && detail.trim()) return detail;
+      // Validation errors come back as a list of {msg, loc}.
+      if (Array.isArray(detail)) {
+        const msgs = detail
+          .map((d) => (d && typeof d === "object" ? (d as { msg?: string }).msg : null))
+          .filter((m): m is string => Boolean(m));
+        if (msgs.length) return msgs.join("; ");
+      }
+    }
+  }
+
+  if (error instanceof Error) return error.message;
+
   try {
     return JSON.stringify(error);
   } catch {

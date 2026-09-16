@@ -1,7 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+
+import {
+  CREDITS_CHANGED_EVENT,
+  type CreditsChangedDetail,
+} from "@/lib/credits-events";
 
 /**
  * The credits balance in the header.
@@ -25,19 +30,40 @@ export function CreditsChip() {
   const [credits, setCredits] = useState<number | null>(null);
   const [failed, setFailed] = useState(false);
 
-  useEffect(() => {
-    const controller = new AbortController();
-
-    fetch("/api/credits", { signal: controller.signal })
+  const load = useCallback((signal?: AbortSignal) => {
+    return fetch("/api/credits", { signal, cache: "no-store" })
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
-      .then((data: { credits: number }) => setCredits(data.credits))
+      .then((data: { credits: number }) => {
+        setCredits(data.credits);
+        setFailed(false);
+      })
       .catch((err: unknown) => {
         if (err instanceof DOMException && err.name === "AbortError") return;
         setFailed(true);
       });
-
-    return () => controller.abort();
   }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void load(controller.signal);
+    return () => controller.abort();
+  }, [load]);
+
+  // The studio spends credits in a different React tree; it broadcasts the new
+  // balance so this chip does not go stale after a generation.
+  useEffect(() => {
+    const onChanged = (event: Event) => {
+      const detail = (event as CustomEvent<CreditsChangedDetail>).detail;
+      if (typeof detail?.credits === "number") {
+        setCredits(detail.credits);
+        setFailed(false);
+      } else {
+        void load();
+      }
+    };
+    window.addEventListener(CREDITS_CHANGED_EVENT, onChanged);
+    return () => window.removeEventListener(CREDITS_CHANGED_EVENT, onChanged);
+  }, [load]);
 
   // A balance we could not read is worse than no chip at all — never guess.
   if (failed) return null;

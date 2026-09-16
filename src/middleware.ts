@@ -5,6 +5,9 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
  * routes are protected the moment they exist rather than when someone remembers
  * to add them.
  *
+ * The product lives under /ai/* (matching the real site's URLs) and is covered
+ * by the default-deny, so it needs no entry here.
+ *
  * /styleguide is on the list because it is our own token preview page and we
  * open it constantly; it is not part of the brief's public set.
  */
@@ -16,6 +19,7 @@ const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/styleguide",
+  "/uitest(.*)", // dev-only UI fixture harness; 404s in production
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
