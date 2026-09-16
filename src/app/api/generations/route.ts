@@ -15,6 +15,7 @@ export async function GET(request: Request) {
   const parsed = listGenerationsSchema.safeParse({
     limit: searchParams.get("limit") ?? undefined,
     cursor: searchParams.get("cursor") ?? undefined,
+    kind: searchParams.get("kind") ?? undefined,
   });
 
   if (!parsed.success) {

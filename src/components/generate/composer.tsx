@@ -1,5 +1,6 @@
 "use client";
 
+import type { GenKind } from "@prisma/client";
 import { useEffect, useRef } from "react";
 
 import {
@@ -8,16 +9,23 @@ import {
   type AspectRatio,
   type ModelId,
 } from "@/lib/credits";
+import { presetBySlug } from "@/data/effects";
 import { AspectRatioPicker } from "./aspect-ratio-picker";
 import { ModelPicker } from "./model-picker";
 
-const PLACEHOLDER =
-  "A lone figure on a rain-slick Tokyo street at night, neon reflections in the puddles, anamorphic lens, 35mm";
+const PLACEHOLDER: Record<GenKind, string> = {
+  IMAGE:
+    "A lone figure on a rain-slick Tokyo street at night, neon reflections in the puddles, anamorphic lens, 35mm",
+  VIDEO:
+    "Slow dolly through a neon-lit alley as rain falls, subject walking away from camera, steam rising from a grate",
+};
 
 export type ComposerState = {
   prompt: string;
   model: ModelId;
   aspectRatio: AspectRatio;
+  /** Effects preset slug, video only. */
+  preset: string | null;
 };
 
 export function Composer({
@@ -27,6 +35,7 @@ export function Composer({
   credits,
   submitting,
   error,
+  kind,
   // The composer is mounted twice — desktop column and mobile sheet — and only
   // one is visible at a time. They still coexist in the DOM, so the textarea id
   // must differ or the document carries duplicate ids and `label for` binds to
@@ -39,6 +48,7 @@ export function Composer({
   credits: number;
   submitting: boolean;
   error: string | null;
+  kind: GenKind;
   fieldId?: string;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -52,6 +62,7 @@ export function Composer({
     el.style.height = `${Math.min(el.scrollHeight, 320)}px`;
   }, [state.prompt]);
 
+  const preset = presetBySlug(state.preset);
   const trimmed = state.prompt.trim();
   const tooLong = trimmed.length > MAX_PROMPT_LENGTH;
   const broke = credits < cost;
@@ -79,12 +90,37 @@ export function Composer({
         >
           Prompt
         </label>
+        {/* A chosen preset is visible and removable — never a hidden modifier
+            silently shaping the result. */}
+        {preset ? (
+          <div className="mb-2 flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-brand/40 bg-brand/10 py-1 pr-1 pl-2.5 text-xs text-brand">
+              {preset.name}
+              <button
+                type="button"
+                aria-label={`Remove ${preset.name} preset`}
+                onClick={() => onChange({ preset: null })}
+                className="grid size-4 place-items-center rounded-full transition-colors duration-200 ease-swift hover:bg-brand/20"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden className="size-2.5" fill="none">
+                  <path
+                    d="M6 6l12 12M18 6L6 18"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </button>
+            </span>
+          </div>
+        ) : null}
+
         <textarea
           id={fieldId}
           ref={textareaRef}
           rows={4}
           value={state.prompt}
-          placeholder={PLACEHOLDER}
+          placeholder={PLACEHOLDER[kind]}
           onChange={(e) => onChange({ prompt: e.target.value })}
           onKeyDown={(e) => {
             // Cmd/Ctrl+Enter submits, the convention for a multi-line composer.
@@ -103,7 +139,7 @@ export function Composer({
         </div>
       </div>
 
-      <ModelPicker value={state.model} onChange={(model) => onChange({ model })} />
+      <ModelPicker kind={kind} value={state.model} onChange={(model) => onChange({ model })} />
 
       <AspectRatioPicker
         value={state.aspectRatio}

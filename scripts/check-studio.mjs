@@ -242,6 +242,103 @@ const browser = await chromium.launch();
   await page.close();
 }
 
+
+/* ------------------------------------------------------------ video studio */
+{
+  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  await page.goto(`${BASE}?kind=video&preset=high-flip`, { waitUntil: "domcontentloaded" });
+  await page.waitForSelector("#prompt-desktop", { state: "visible", timeout: 30000 });
+  await waitForHydration(page, "#prompt-desktop");
+  console.log("\n[video studio]");
+
+  const aside = page.locator("aside").first();
+
+  check(
+    "stub is disclosed in the composer",
+    await aside.getByText(/Video is simulated in this build/).isVisible(),
+  );
+  check(
+    "video model offered",
+    await aside.getByRole("button", { name: "Higgsfield Motion" }).isVisible(),
+  );
+  check(
+    "video cost is 12 credits",
+    (await aside.getByRole("button", { name: /Generate ./ }).textContent()).includes("12 credits"),
+  );
+  check(
+    "preset arrives pre-filled from the query",
+    (await page.locator("#prompt-desktop").inputValue()).toLowerCase().includes("rotation"),
+  );
+
+  const chip = aside.getByRole("button", { name: "Remove High flip preset" });
+  check("preset shows as a chip", await chip.isVisible());
+  await chip.click();
+  const removed = await waitFor(async () => !(await chip.isVisible()));
+  check("preset chip is removable", removed);
+
+  const video = page.locator("video").first();
+  check("video result renders a <video>", (await video.count()) > 0);
+  check("video is muted", await video.evaluate((el) => el.muted));
+  check("video has a poster frame", Boolean(await video.getAttribute("poster")));
+  // The served markup must not preload anything: the IntersectionObserver
+  // decides. Checked against the HTML rather than the hydrated DOM, where this
+  // fixture is legitimately already in view and therefore armed.
+  const servedHtml = await (await fetch(`${BASE}?kind=video&preset=high-flip`)).text();
+  check(
+    "served markup preloads no video",
+    servedHtml.includes('preload="none"') && !servedHtml.includes('preload="metadata"'),
+  );
+
+  await video.scrollIntoViewIfNeeded();
+  const armed = await waitFor(async () => (await video.getAttribute("preload")) === "metadata");
+  check("in-view video arms preload", armed);
+
+  await video.hover();
+  const playing = await waitFor(async () => video.evaluate((el) => !el.paused), 8000);
+  check("hover plays the video", playing);
+
+  await page.mouse.move(10, 10);
+  const paused = await waitFor(async () => video.evaluate((el) => el.paused));
+  check("leaving pauses the video", paused);
+
+  await page.screenshot({ path: `${OUT}/studio-video.png` });
+  await page.close();
+}
+
+/* ---------------------------------------------------------------- effects */
+{
+  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  await page.goto(`http://localhost:${PORT}/effects`, { waitUntil: "domcontentloaded" });
+  await page.waitForSelector("article img", { state: "visible", timeout: 30000 });
+  console.log("\n[effects]");
+
+  const cards = page.locator("article");
+  check("15 preset cards", (await cards.count()) === 15, `${await cards.count()}`);
+
+  const recreate = page.getByRole("link", { name: "Recreate" });
+  check("every card has Recreate", (await recreate.count()) === 15, `${await recreate.count()}`);
+  check(
+    "Recreate deep-links with the preset",
+    (await recreate.first().getAttribute("href")) === "/ai/video?preset=floating-fall",
+    await recreate.first().getAttribute("href"),
+  );
+
+  const thumbs = await page
+    .locator("article img")
+    .evaluateAll((els) => els.map((el) => el.getAttribute("src")));
+  check("15 distinct thumbnails", new Set(thumbs).size === 15, `${new Set(thumbs).size}`);
+  // loading="lazy" means "decoded already" is a race; wait for it.
+  const loaded = await waitFor(
+    async () =>
+      page.locator("article img").first().evaluate((el) => el.complete && el.naturalWidth > 0),
+    20000,
+  );
+  check("thumbnails actually load", loaded);
+
+  await page.screenshot({ path: `${OUT}/effects.png` });
+  await page.close();
+}
+
 await browser.close();
 console.log(`\n${failures === 0 ? "ALL STUDIO CHECKS PASSED" : `${failures} CHECK(S) FAILED`}`);
 process.exit(failures === 0 ? 0 : 1);

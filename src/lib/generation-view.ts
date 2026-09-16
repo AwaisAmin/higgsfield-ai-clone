@@ -13,7 +13,10 @@ import type { Generation } from "@prisma/client";
  */
 export type GenerationView = {
   id: string;
+  kind: "IMAGE" | "VIDEO";
   prompt: string;
+  /** Effects preset slug, video only. */
+  preset: string | null;
   model: string;
   aspectRatio: string;
   status: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED";
@@ -30,7 +33,9 @@ export type GenerationView = {
 export function toGenerationView(row: Generation): GenerationView {
   return {
     id: row.id,
+    kind: row.kind,
     prompt: row.prompt,
+    preset: row.preset,
     model: row.model,
     aspectRatio: row.aspectRatio,
     status: row.status,

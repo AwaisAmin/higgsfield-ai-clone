@@ -9,13 +9,45 @@
  */
 import "dotenv/config";
 
-import { creditsFor, DEFAULT_ASPECT_RATIO, DEFAULT_MODEL } from "../src/lib/credits";
+import {
+  creditsFor,
+  DEFAULT_ASPECT_RATIO,
+  DEFAULT_MODEL,
+  DEFAULT_VIDEO_ASPECT_RATIO,
+  DEFAULT_VIDEO_MODEL,
+  isModelId,
+  MODELS,
+  type ModelSpec,
+} from "../src/lib/credits";
 import { createGeneration, syncGeneration } from "../src/lib/generations";
 import { prisma } from "../src/lib/prisma";
 
+/**
+ * Usage: npx tsx scripts/prove-generation.ts [model] ["a prompt"]
+ * `model` may be a full id or the shorthand "image" / "video".
+ */
+const MODEL_ARG = process.argv[2] ?? "image";
+const MODEL =
+  MODEL_ARG === "image"
+    ? DEFAULT_MODEL
+    : MODEL_ARG === "video"
+      ? DEFAULT_VIDEO_MODEL
+      : isModelId(MODEL_ARG)
+        ? MODEL_ARG
+        : (() => {
+            console.error(`Unknown model "${MODEL_ARG}".`);
+            process.exit(1);
+          })();
+
+// Widened: `as const satisfies` narrows each entry past the optional keys.
+const SPEC: ModelSpec = MODELS[MODEL];
+const IS_VIDEO = SPEC.kind === "VIDEO";
+
 const PROMPT =
-  process.argv[2] ??
-  "A lone figure on a rain-slick Tokyo street at night, neon reflections, anamorphic, 35mm";
+  process.argv[3] ??
+  (IS_VIDEO
+    ? "Slow dolly through a neon-lit alley as rain falls, steam rising from a grate"
+    : "A lone figure on a rain-slick Tokyo street at night, neon reflections, anamorphic, 35mm");
 
 const POLL_INTERVAL_MS = 2000;
 const TIMEOUT_MS = 180_000;
@@ -29,20 +61,20 @@ async function main() {
     process.exit(1);
   }
 
-  const cost = creditsFor(DEFAULT_MODEL);
+  const cost = creditsFor(MODEL);
 
   console.log("user      ", user.id);
   console.log("email     ", user.email);
   console.log("credits   ", user.credits, "(before)");
-  console.log("model     ", DEFAULT_MODEL, `— ${cost} credits`);
+  console.log("model     ", MODEL, `— ${cost} credits`, SPEC.stubbed ? "(STUBBED)" : "");
   console.log("prompt    ", JSON.stringify(PROMPT));
   console.log("");
 
   const started = Date.now();
   const generation = await createGeneration(user.id, {
     prompt: PROMPT,
-    aspectRatio: DEFAULT_ASPECT_RATIO,
-    model: DEFAULT_MODEL,
+    aspectRatio: IS_VIDEO ? DEFAULT_VIDEO_ASPECT_RATIO : DEFAULT_ASPECT_RATIO,
+    model: MODEL,
   });
 
   console.log("submitted ", generation.id);
@@ -86,6 +118,7 @@ async function main() {
   console.log("─".repeat(70));
   console.log("status     ", current.status, `(${elapsed}s, ${polls} polls)`);
   console.log("resultUrl  ", current.resultUrl ?? "(none)");
+  console.log("thumbnail  ", current.thumbnailUrl ?? "(none)");
   console.log("completedAt", current.completedAt?.toISOString() ?? "(none)");
   console.log("error      ", current.error ?? "(none)");
   console.log("creditsSpent", current.creditsSpent);

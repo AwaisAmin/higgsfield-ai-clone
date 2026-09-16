@@ -8,7 +8,7 @@ import type { GenKind } from "@prisma/client";
  * and users will be right to be annoyed.
  */
 
-export type ModelId = "fal-ai/flux/schnell";
+export type ModelId = "fal-ai/flux/schnell" | "higgsfield/stub-video";
 
 export type ModelSpec = {
   id: ModelId;
@@ -17,6 +17,11 @@ export type ModelSpec = {
   /** Credits charged per generation. */
   credits: number;
   description: string;
+  /**
+   * True when the output is simulated rather than generated. Surfaced in the
+   * UI — see the notice in the video composer. Never hide this.
+   */
+  stubbed?: boolean;
 };
 
 export const MODELS = {
@@ -27,11 +32,21 @@ export const MODELS = {
     credits: 4,
     description: "Four-step image model. Fast and cheap.",
   },
+  "higgsfield/stub-video": {
+    id: "higgsfield/stub-video",
+    label: "Higgsfield Motion",
+    kind: "VIDEO",
+    credits: 12,
+    description:
+      "Simulated in this build — runs the real pipeline and returns a pre-rendered clip.",
+    stubbed: true,
+  },
 } as const satisfies Record<ModelId, ModelSpec>;
 
 export const MODEL_IDS = Object.keys(MODELS) as [ModelId, ...ModelId[]];
 
 export const DEFAULT_MODEL: ModelId = "fal-ai/flux/schnell";
+export const DEFAULT_VIDEO_MODEL: ModelId = "higgsfield/stub-video";
 
 export function creditsFor(model: ModelId): number {
   return MODELS[model].credits;
@@ -41,15 +56,21 @@ export function isModelId(value: string): value is ModelId {
   return value in MODELS;
 }
 
+export function modelsOfKind(kind: GenKind): ModelSpec[] {
+  return Object.values(MODELS).filter((m) => m.kind === kind);
+}
+
 /**
- * Aspect ratios we offer. The provider-specific translation lives in
- * src/lib/fal.ts -- this list is product vocabulary, not fal's.
+ * Aspect ratios we offer. The provider-specific translation lives with each
+ * provider -- this list is product vocabulary.
  */
 export const ASPECT_RATIOS = ["1:1", "16:9", "9:16", "4:3", "3:4"] as const;
 
 export type AspectRatio = (typeof ASPECT_RATIOS)[number];
 
 export const DEFAULT_ASPECT_RATIO: AspectRatio = "1:1";
+/** Video defaults to vertical — the format the presets are cut for. */
+export const DEFAULT_VIDEO_ASPECT_RATIO: AspectRatio = "9:16";
 
 /** Credits granted to a new account. Mirrored by User.credits in the schema. */
 export const STARTING_CREDITS = 100;

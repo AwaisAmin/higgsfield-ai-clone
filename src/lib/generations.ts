@@ -1,14 +1,10 @@
 import "server-only";
 
-import type { Generation } from "@prisma/client";
+import type { GenKind, Generation } from "@prisma/client";
 
 import { creditsFor, type AspectRatio, type ModelId, MODELS } from "./credits";
-import {
-  getGenerationResult,
-  getGenerationStatus,
-  submitGeneration,
-} from "./fal";
 import { prisma } from "./prisma";
+import { providerFor } from "./providers";
 
 /**
  * Generation service.
@@ -16,6 +12,11 @@ import { prisma } from "./prisma";
  * Deliberately separate from the route handlers: the routes do auth, parsing
  * and HTTP status codes, and everything below is plain functions over a userId.
  * That keeps the pipeline testable from a script without minting a session.
+ *
+ * It is also provider-agnostic: every backend is reached through the
+ * GenerationProvider contract in ./providers, so image and video run the same
+ * status transitions, the same polling and the same credit accounting. Nothing
+ * in this file knows that video is currently stubbed.
  *
  * KNOWN TRADEOFF — result URLs are fal's, stored as-is.
  * We persist the URL fal hands back instead of mirroring the bytes into blob
@@ -40,6 +41,8 @@ export type CreateGenerationInput = {
   prompt: string;
   aspectRatio: AspectRatio;
   model: ModelId;
+  /** Effects preset slug, video only. */
+  preset?: string | null;
 };
 
 export async function createGeneration(
@@ -72,13 +75,14 @@ export async function createGeneration(
       model: input.model,
       prompt: input.prompt,
       aspectRatio: input.aspectRatio,
+      preset: input.preset ?? null,
       status: "QUEUED",
       creditsSpent: cost,
     },
   });
 
   try {
-    const requestId = await submitGeneration(input);
+    const requestId = await providerFor(input.model).submit(input);
     return await prisma.generation.update({
       where: { id: generation.id },
       data: { requestId },
@@ -112,9 +116,11 @@ export async function syncGeneration(
 
   const model = generation.model as ModelId;
 
-  let status: Awaited<ReturnType<typeof getGenerationStatus>>;
+  const provider = providerFor(model);
+
+  let status: Awaited<ReturnType<typeof provider.status>>;
   try {
-    status = await getGenerationStatus(model, generation.requestId);
+    status = await provider.status(model, generation.requestId);
   } catch (error) {
     // A status call that fails is not proof the generation failed — the network
     // may simply be unhappy. Report the row as-is and let the next poll decide.
@@ -132,21 +138,21 @@ export async function syncGeneration(
     });
   }
 
-  // COMPLETED. fal has no FAILED queue status: a failed run surfaces as a throw
-  // when the result is fetched.
+  // COMPLETED. There is no FAILED queue status in this contract: a failed run
+  // surfaces as a throw when the result is fetched.
   try {
-    const { imageUrl } = await getGenerationResult(model, generation.requestId);
-    if (!imageUrl) {
-      return failGeneration(id, "Provider returned no image.");
+    const { url, posterUrl } = await provider.result(model, generation.requestId);
+    if (!url) {
+      return failGeneration(id, "Provider returned no result.");
     }
 
     return await prisma.generation.update({
       where: { id },
       data: {
         status: "SUCCEEDED",
-        resultUrl: imageUrl,
-        // No separate thumbnail pipeline yet; the full image doubles as one.
-        thumbnailUrl: imageUrl,
+        resultUrl: url,
+        // Video carries a real poster frame; an image is its own thumbnail.
+        thumbnailUrl: posterUrl ?? url,
         completedAt: new Date(),
         error: null,
       },
@@ -196,11 +202,11 @@ export type GenerationPage = {
 /** The user's own generations, newest first, cursor-paginated. */
 export async function listGenerations(
   userId: string,
-  { limit, cursor }: { limit: number; cursor?: string },
+  { limit, cursor, kind }: { limit: number; cursor?: string; kind?: GenKind },
 ): Promise<GenerationPage> {
   // Fetch one extra to learn whether another page exists without a count query.
   const rows = await prisma.generation.findMany({
-    where: { userId },
+    where: { userId, ...(kind ? { kind } : {}) },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: limit + 1,
     ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),

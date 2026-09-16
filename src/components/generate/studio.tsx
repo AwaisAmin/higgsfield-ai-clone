@@ -1,11 +1,16 @@
 "use client";
 
+import type { GenKind } from "@prisma/client";
 import { useCallback, useMemo, useState } from "react";
 
+import { presetBySlug } from "@/data/effects";
 import {
   creditsFor,
   DEFAULT_ASPECT_RATIO,
   DEFAULT_MODEL,
+  DEFAULT_VIDEO_ASPECT_RATIO,
+  DEFAULT_VIDEO_MODEL,
+  type AspectRatio,
   type ModelId,
 } from "@/lib/credits";
 import { notifyCreditsChanged } from "@/lib/credits-events";
@@ -16,19 +21,36 @@ import { EmptyState } from "./empty-state";
 import { Lightbox } from "./lightbox";
 import { ResultCard } from "./result-card";
 
-export function ImageStudio({
+/**
+ * The generation surface, shared by /ai/image and /ai/video.
+ *
+ * One component rather than two so the pages cannot drift apart: the layout,
+ * the optimistic insert, the polling and the credit accounting are identical,
+ * and only the model list, the defaults and the preset affordance vary by kind.
+ */
+export function Studio({
+  kind,
   initialItems,
   initialCredits,
+  initialPreset = null,
 }: {
+  kind: GenKind;
   initialItems: GenerationView[];
   initialCredits: number;
+  /** Preset slug arriving from /effects via ?preset=. */
+  initialPreset?: string | null;
 }) {
+  const isVideo = kind === "VIDEO";
   const [items, setItems] = useState<GenerationView[]>(initialItems);
   const [credits, setCredits] = useState(initialCredits);
-  const [composer, setComposer] = useState<ComposerState>({
-    prompt: "",
-    model: DEFAULT_MODEL,
-    aspectRatio: DEFAULT_ASPECT_RATIO,
+  const [composer, setComposer] = useState<ComposerState>(() => {
+    const preset = isVideo ? presetBySlug(initialPreset) : null;
+    return {
+      prompt: preset?.prompt ?? "",
+      model: isVideo ? DEFAULT_VIDEO_MODEL : DEFAULT_MODEL,
+      aspectRatio: isVideo ? DEFAULT_VIDEO_ASPECT_RATIO : DEFAULT_ASPECT_RATIO,
+      preset: preset?.slug ?? null,
+    };
   });
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -81,6 +103,8 @@ export function ImageStudio({
     const tempId = `optimistic-${Date.now()}`;
     const optimistic: GenerationView = {
       id: tempId,
+      kind,
+      preset: composer.preset,
       prompt,
       model: composer.model,
       aspectRatio: composer.aspectRatio,
@@ -112,6 +136,7 @@ export function ImageStudio({
           prompt,
           model: composer.model,
           aspectRatio: composer.aspectRatio,
+          preset: composer.preset,
         }),
       });
 
@@ -144,13 +169,14 @@ export function ImageStudio({
     } finally {
       setSubmitting(false);
     }
-  }, [composer, credits, refreshCredits, submitting]);
+  }, [composer, credits, kind, refreshCredits, submitting]);
 
   const retry = useCallback((generation: GenerationView) => {
     setComposer({
       prompt: generation.prompt,
       model: generation.model as ModelId,
-      aspectRatio: generation.aspectRatio as ComposerState["aspectRatio"],
+      aspectRatio: generation.aspectRatio as AspectRatio,
+      preset: generation.preset,
     });
     setSheetOpen(true);
     // Focus whichever composer is actually on screen at this breakpoint.
@@ -173,6 +199,7 @@ export function ImageStudio({
 
   const renderComposer = (fieldId: string) => (
     <Composer
+      kind={kind}
       fieldId={fieldId}
       state={composer}
       onChange={(next) => setComposer((c) => ({ ...c, ...next }))}
@@ -196,7 +223,7 @@ export function ImageStudio({
         <section className="min-w-0 flex-1 pb-32 lg:pb-0">
           <div className="mb-5 flex items-baseline justify-between">
             <h1 className="font-display text-2xl tracking-tight text-text-primary">
-              Image
+              {isVideo ? "Video" : "Image"}
             </h1>
             <span className="font-mono text-xs text-text-tertiary">
               {items.length} {items.length === 1 ? "generation" : "generations"}
@@ -205,6 +232,7 @@ export function ImageStudio({
 
           {items.length === 0 ? (
             <EmptyState
+              kind={kind}
               onPick={(prompt) => {
                 setComposer((c) => ({ ...c, prompt }));
                 setSheetOpen(true);

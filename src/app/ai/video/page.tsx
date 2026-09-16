@@ -6,20 +6,27 @@ import { toGenerationView } from "@/lib/generation-view";
 import { listGenerations } from "@/lib/generations";
 
 export const metadata: Metadata = {
-  title: "Image",
-  description: "Generate images from a prompt.",
+  title: "Video",
+  description: "Generate video from a prompt, with effects presets.",
 };
 
-export default async function ImagePage() {
-  // Safe to require: /ai/* is behind the middleware.
+export default async function VideoPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ preset?: string }>;
+}) {
   const user = await requireCurrentUser();
-  const { items } = await listGenerations(user.id, { limit: 24, kind: "IMAGE" });
+  const [{ items }, { preset }] = await Promise.all([
+    listGenerations(user.id, { limit: 24, kind: "VIDEO" }),
+    searchParams,
+  ]);
 
   return (
     <Studio
-      kind="IMAGE"
+      kind="VIDEO"
       initialItems={items.map(toGenerationView)}
       initialCredits={user.credits}
+      initialPreset={preset ?? null}
     />
   );
 }

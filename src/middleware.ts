@@ -18,6 +18,7 @@ const isPublicRoute = createRouteMatcher([
   "/community",
   "/sign-in(.*)",
   "/sign-up(.*)",
+  "/effects", // browsable gallery; Recreate links into the protected studio
   "/styleguide",
   "/uitest(.*)", // dev-only UI fixture harness; 404s in production
 ]);

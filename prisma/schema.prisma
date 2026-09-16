@@ -48,6 +48,8 @@ model Generation {
   model        String
   prompt       String
   aspectRatio  String    @default("1:1")
+  /// Effects preset slug (video only), e.g. "high-flip". Null for plain prompts.
+  preset       String?
   status       GenStatus @default(QUEUED)
   // fal.ai queue handle, set right after submit. Null only between row creation
   // and a successful submit, or if the submit failed outright.
