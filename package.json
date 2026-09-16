@@ -14,7 +14,8 @@
     "db:check": "node scripts/check-db.mjs",
     "prove:generation": "tsx --conditions react-server scripts/prove-generation.ts",
     "check:validation": "tsx scripts/check-validation.ts",
-    "check:studio": "node scripts/check-studio.mjs"
+    "check:studio": "node scripts/check-studio.mjs",
+    "check:home": "node scripts/check-home.mjs"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.9.4",
