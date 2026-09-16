@@ -3,7 +3,7 @@ import Link from "next/link";
 // Placeholder. The landing sections and the generation flow land in later steps.
 export default function Home() {
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center gap-6 px-6 text-center">
+    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6 px-6 py-24 text-center">
       <p className="font-mono text-xs uppercase tracking-tight text-brand">
         Higgsfield rebuild
       </p>
@@ -20,6 +20,6 @@ export default function Home() {
       >
         View styleguide
       </Link>
-    </main>
+    </div>
   );
 }

@@ -138,7 +138,7 @@ function Ramp({ name, swatches }: { name: string; swatches: Swatch[] }) {
 
 export default function StyleguidePage() {
   return (
-    <main className="mx-auto max-w-6xl px-6 py-16">
+    <div className="mx-auto max-w-6xl px-6 py-16">
       <header className="mb-12">
         <p className="font-mono text-xs uppercase tracking-tight text-brand">
           Higgsfield rebuild
@@ -370,6 +370,6 @@ export default function StyleguidePage() {
           </div>
         </Section>
       </div>
-    </main>
+    </div>
   );
 }

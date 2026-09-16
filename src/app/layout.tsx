@@ -1,5 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, Inter, Space_Grotesk } from "next/font/google";
+
+import { Footer } from "@/components/site/footer";
+import { Header } from "@/components/site/header";
+import { PromoBar } from "@/components/site/promo-bar";
 import "./globals.css";
 
 const inter = Inter({
@@ -44,7 +48,18 @@ export default function RootLayout({
       lang="en"
       className={`${inter.variable} ${spaceGrotesk.variable} ${ibmPlexMono.variable}`}
     >
-      <body className="bg-page text-text-primary antialiased">{children}</body>
+      <body className="bg-page text-text-primary antialiased">
+        <a
+          href="#content"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-100 focus:rounded-lg focus:bg-brand focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-on-brand"
+        >
+          Skip to content
+        </a>
+        <PromoBar />
+        <Header />
+        <main id="content">{children}</main>
+        <Footer />
+      </body>
     </html>
   );
 }
