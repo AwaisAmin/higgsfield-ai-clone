@@ -162,6 +162,23 @@ function latestModel(entries) {
   return null;
 }
 
+/**
+ * True when a "prompt" is really a machine event rather than something the user
+ * typed — a background-task notification or a system reminder. The runtime
+ * re-invokes the turn for these, so UserPromptSubmit fires with the event XML
+ * as the prompt body. Logging them produces entries nobody wrote, with no
+ * response attached. Anything with real text alongside the event is still
+ * logged in full and verbatim.
+ */
+function isSystemEvent(text) {
+  const remainder = text
+    .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "")
+    .replace(/<task-notification>[\s\S]*?<\/task-notification>/g, "")
+    .replace(/\[SYSTEM NOTIFICATION - NOT USER INPUT\]/g, "")
+    .trim();
+  return remainder.length === 0;
+}
+
 function lastUserPrompt(entries) {
   for (let i = entries.length - 1; i >= 0; i--) {
     const e = entries[i];
@@ -282,6 +299,7 @@ function main() {
     const entries = readTranscript(payload.transcript_path);
     const prompt = String(payload.prompt == null ? "" : payload.prompt).trim() || lastUserPrompt(entries);
     if (!prompt) return;
+    if (isSystemEvent(prompt)) return;
 
     const model = latestModel(entries) || MODEL_UNKNOWN;
 

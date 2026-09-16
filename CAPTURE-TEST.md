@@ -33,6 +33,41 @@ inside turn 1 and wrote its turn into the same transcript, interleaved. Segmenti
 "next human prompt" therefore mis-assigned both turns. The two streams separate cleanly
 on the `entrypoint` field (`cli` vs `sdk-cli`), which is how the backfill splits them.
 
+## Update — capture resumed mid-session, 2026-09-16 15:07 UTC
+
+The hook **started firing in session `03737485`** at 15:07:58 UTC, without the
+session being restarted. It had gone the whole build unhooked (see the backfill
+notice above); from that timestamp on it captured live.
+
+That leaves this session with **two log files**, which is deliberate and not
+tidied away:
+
+| File | Range | How |
+|---|---|---|
+| `.agent-logs/2026-09-16_04-12-36_03737485.md` | 04:12 – 11:59 | backfilled from the transcript |
+| `.agent-logs/2026-09-16_15-07-58_03737485.md` | 15:07 – ongoing | captured live by the hook |
+
+The hook keys its log file off `.claude/.capture-state/<session-id>.json`, and
+no state file existed for this session (the backfill wrote the log, not the
+state), so it opened a fresh file rather than appending to the backfilled one.
+
+### A real flaw this exposed
+
+The live file's first six entries are **not prompts anyone typed** — they are
+background-task notifications. The runtime re-invokes a turn when a background
+command finishes, and `UserPromptSubmit` fires with the notification XML as the
+prompt body, so the hook logged them as prompts. They have no responses, because
+those turns produced no assistant text.
+
+`isSystemEvent()` in `.claude/hooks/capture.js` now skips a prompt whose entire
+body is task-notification or system-reminder markup. A prompt that merely
+*contains* one alongside real text is still logged in full and verbatim — that
+case is unit-tested, along with a prompt that only mentions the tag in prose.
+
+The six orphan entries are **left in place**. They are an accurate record of what
+the hook received, and the brief is explicit that a messy honest log beats a
+clean one.
+
 ## 1. Setup
 
 | | |
