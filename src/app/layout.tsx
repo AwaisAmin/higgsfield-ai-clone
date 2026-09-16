@@ -5,7 +5,6 @@ import { IBM_Plex_Mono, Inter, Space_Grotesk } from "next/font/google";
 import { Footer } from "@/components/site/footer";
 import { Header } from "@/components/site/header";
 import { PromoBar } from "@/components/site/promo-bar";
-import { getCurrentUser } from "@/lib/auth";
 import { clerkAppearance } from "@/lib/clerk-appearance";
 import "./globals.css";
 
@@ -43,15 +42,13 @@ export const viewport: Viewport = {
   colorScheme: "dark",
 };
 
-export default async function RootLayout({
+// Deliberately NOT async and free of dynamic APIs: an await here would opt the
+// entire route tree into dynamic rendering and cost us static marketing pages.
+// Auth-dependent UI is pushed down -- signed-in/out is decided client-side by
+// Clerk, and the credits balance is a Suspense-wrapped server component.
+export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  // Resolving the user here is what makes the credits chip work on every page.
-  // It also opts the whole tree into dynamic rendering, which is the right call
-  // for an auth-gated product but worth remembering if a marketing page ever
-  // needs to be static.
-  const user = await getCurrentUser();
-
   return (
     <ClerkProvider appearance={clerkAppearance}>
       <html
@@ -66,13 +63,7 @@ export default async function RootLayout({
             Skip to content
           </a>
           <PromoBar />
-          <Header
-            session={
-              user
-                ? { status: "authed", credits: user.credits }
-                : { status: "anon" }
-            }
-          />
+          <Header />
           <main id="content">{children}</main>
           <Footer />
         </body>

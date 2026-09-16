@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { primaryNav, utilityNav, type NavBadge } from "@/data/nav";
-import { HeaderActions, type HeaderSession } from "./header-actions";
+import { HeaderActions } from "./header-actions";
 import { LogoGlyph, Wordmark } from "./logo";
 
 const HEADER_HEIGHT = 52;
@@ -40,7 +40,7 @@ function Chevron({ open }: { open: boolean }) {
   );
 }
 
-export function Header({ session }: { session?: HeaderSession }) {
+export function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [exploreOpen, setExploreOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -230,7 +230,7 @@ export function Header({ session }: { session?: HeaderSession }) {
               {item.label}
             </Link>
           ))}
-          <HeaderActions session={session} />
+          <HeaderActions />
         </div>
       </div>
 
