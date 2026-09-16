@@ -1,0 +1,3 @@
+# Per-session runtime counters for the capture hook. Not logs.
+# NOTE: .agent-logs/ is deliberately NOT ignored -- it ships with the repo.
+.claude/.capture-state/
