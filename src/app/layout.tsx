@@ -1,9 +1,12 @@
+import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, Inter, Space_Grotesk } from "next/font/google";
 
 import { Footer } from "@/components/site/footer";
 import { Header } from "@/components/site/header";
 import { PromoBar } from "@/components/site/promo-bar";
+import { getCurrentUser } from "@/lib/auth";
+import { clerkAppearance } from "@/lib/clerk-appearance";
 import "./globals.css";
 
 const inter = Inter({
@@ -40,26 +43,40 @@ export const viewport: Viewport = {
   colorScheme: "dark",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  // Resolving the user here is what makes the credits chip work on every page.
+  // It also opts the whole tree into dynamic rendering, which is the right call
+  // for an auth-gated product but worth remembering if a marketing page ever
+  // needs to be static.
+  const user = await getCurrentUser();
+
   return (
-    <html
-      lang="en"
-      className={`${inter.variable} ${spaceGrotesk.variable} ${ibmPlexMono.variable}`}
-    >
-      <body className="bg-page text-text-primary antialiased">
-        <a
-          href="#content"
-          className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-100 focus:rounded-lg focus:bg-brand focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-on-brand"
-        >
-          Skip to content
-        </a>
-        <PromoBar />
-        <Header />
-        <main id="content">{children}</main>
-        <Footer />
-      </body>
-    </html>
+    <ClerkProvider appearance={clerkAppearance}>
+      <html
+        lang="en"
+        className={`${inter.variable} ${spaceGrotesk.variable} ${ibmPlexMono.variable}`}
+      >
+        <body className="bg-page text-text-primary antialiased">
+          <a
+            href="#content"
+            className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-100 focus:rounded-lg focus:bg-brand focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-on-brand"
+          >
+            Skip to content
+          </a>
+          <PromoBar />
+          <Header
+            session={
+              user
+                ? { status: "authed", credits: user.credits }
+                : { status: "anon" }
+            }
+          />
+          <main id="content">{children}</main>
+          <Footer />
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

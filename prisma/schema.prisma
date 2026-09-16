@@ -1,0 +1,66 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // Prisma 7 moved connection URLs out of the schema: migrations read
+  // prisma.config.ts (DIRECT_URL), and the runtime client connects through the
+  // Neon driver adapter on the pooled URL. See src/lib/prisma.ts.
+}
+
+enum Plan {
+  FREE
+  BASIC
+  PRO
+  ULTIMATE
+}
+
+enum GenKind {
+  IMAGE
+  VIDEO
+}
+
+enum GenStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+model User {
+  // The Clerk user id (user_xxx). Using it as the PK means no lookup table and
+  // no divergence between the auth provider's identity and ours.
+  id          String       @id
+  email       String       @unique
+  name        String?
+  imageUrl    String?
+  credits     Int          @default(100)
+  plan        Plan         @default(FREE)
+  createdAt   DateTime     @default(now())
+  generations Generation[]
+}
+
+model Generation {
+  id           String    @id @default(uuid())
+  userId       String
+  kind         GenKind
+  model        String
+  prompt       String
+  aspectRatio  String    @default("1:1")
+  status       GenStatus @default(QUEUED)
+  resultUrl    String?
+  thumbnailUrl String?
+  error        String?
+  creditsSpent Int       @default(0)
+  isPublic     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  completedAt  DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // The user's own gallery, newest first.
+  @@index([userId, createdAt])
+  // The community feed reads this one.
+  @@index([isPublic, createdAt])
+}

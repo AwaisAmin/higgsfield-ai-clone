@@ -46,3 +46,6 @@ next-env.d.ts
 
 # playwright screenshots from scripts/check-responsive.mjs
 scripts/.screenshots/
+
+# but the documented template ships with the repo
+!.env.example

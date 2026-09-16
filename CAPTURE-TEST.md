@@ -3,6 +3,36 @@
 Proof that prompt/response capture is installed, automatic, and works in sessions
 other than the one that installed it.
 
+## ⚠️ Backfill notice — 2026-09-16
+
+**Five turns in session `03737485` were backfilled from transcripts, not captured
+live.** They are marked `backfilled: true` in
+`.agent-logs/2026-09-16_04-12-36_03737485.md`.
+
+What happened: Claude Code reads hook configuration **at session start**. Session
+`03737485` is the session in which `.claude/settings.json` was *created* — so that
+session had already started without hooks, and never picked them up. Every session
+started afterwards captured correctly, which is why the canaries always passed while
+the working session silently logged nothing. Four build steps (scaffold + tokens, the
+stop-committing instruction, site chrome, auth + database) went unrecorded before this
+was run to ground.
+
+The hook itself was never broken, and nothing about it was changed to fix this. It was
+re-tested on 2026-09-16 at 12:06 UTC in a fresh session and captured normally — see
+section 6.
+
+The recovery used `scripts/backfill-from-transcript.mjs`, which reads Claude Code's own
+JSONL transcript at `~/.claude/projects/D--Dev-higgsfield-ai/<session-id>.jsonl` and
+applies the same extraction rules as the live hook. Prompts, responses, timestamps and
+model names are verbatim from that transcript. Nothing was written that is not in it.
+The turn that issued the backfill instruction is itself absent, because its response did
+not exist yet at extraction time and inventing one was not an option.
+
+One wrinkle is documented in the log file's own header: a `claude -c` subprocess ran
+inside turn 1 and wrote its turn into the same transcript, interleaved. Segmenting by
+"next human prompt" therefore mis-assigned both turns. The two streams separate cleanly
+on the `entrypoint` field (`cli` vs `sdk-cli`), which is how the backfill splits them.
+
 ## 1. Setup
 
 | | |
@@ -237,12 +267,65 @@ survives as content, numbering stays correct, and the real headers get backfille
 
 `claude -p --resume dffa46d5-*` used an unexpanded shell glob, so the fallback
 `claude -c` continued *this* session instead of the canary one. That is why
-`.agent-logs/2026-09-16_04-19-13_03737485.md` exists and contains a turn I did not type
-interactively. Left in place rather than deleted.
+`.agent-logs/2026-09-16_04-12-36_03737485.md` contains a turn I did not type
+interactively. Left in place rather than deleted. (That file was renamed from
+`..._04-19-13_...` during the 2026-09-16 backfill, so its timestamp matches the
+session's real first prompt rather than the subprocess's.)
 
-## 6. Known limitation
+## 6. Known limitation, and the re-proof after it bit
 
-Claude Code loads hook configuration at session start. The interactive session that
-installed these hooks started *before* `.claude/settings.json` existed, so that one
-session does not fire them. Every session started afterwards does — which is what the
-canaries demonstrate. The build work is done in a session started after installation.
+Claude Code loads hook configuration **at session start**. The interactive session that
+installed these hooks started *before* `.claude/settings.json` existed, so that session
+never fired them.
+
+This was flagged as a limitation from the beginning — and then it cost four build steps
+anyway, because every canary kept passing while the session actually doing the work
+recorded nothing. See the backfill notice at the top. The lesson is not subtle: after
+installing the hook, restart the session you intend to work in, and verify capture from
+*inside* that session rather than from a fresh subprocess.
+
+Re-proof after the backfill, in two separate brand-new sessions, neither of which
+installed the hook:
+
+### Canary A — `.agent-logs/2026-09-16_12-06-06_69459d79.md`
+
+```
+[LOG_ENTRY type=PROMPT num=1 session=69459d79]
+timestamp: 2026-09-16T12:06:06.368Z
+model: claude-opus-5
+
+CAPTURE TEST — diagnosis canary, Awais Amin
+
+
+[LOG_ENTRY type=RESPONSE num=1 session=69459d79]
+timestamp: 2026-09-16T12:06:10.269Z
+model: claude-opus-5
+
+Got your capture test message: "CAPTURE TEST — diagnosis canary, Awais Amin". I didn't run any tools or change any files, so this reply is all your prompt/response capture hook has to record. Check that both the prompt and this reply show up in its output.
+
+Separately, the claude.ai Digits connector needs to be authorized, and you can do that in your claude.ai connector settings. Its tools won't work until then.
+```
+
+### Canary B — `.agent-logs/2026-09-16_12-12-02_6442e984.md`
+
+```
+[LOG_ENTRY type=PROMPT num=1 session=6442e984]
+timestamp: 2026-09-16T12:12:02.497Z
+model: claude-opus-5
+
+CAPTURE TEST — post-backfill canary, second session, Awais Amin
+
+
+[LOG_ENTRY type=RESPONSE num=1 session=6442e984]
+timestamp: 2026-09-16T12:12:05.905Z
+model: claude-opus-5
+
+Got your canary message: "CAPTURE TEST — post-backfill canary, second session, Awais Amin".
+
+I didn't change any files. To confirm the hook worked, look in `.agent-logs/` for a new log from this session that contains that exact line and this reply.
+```
+
+Nine session logs now exist. The hook command is `node .claude/hooks/capture.js` — plain
+Node, invoked with a relative path, no shell script and no POSIX-only path anywhere. It
+runs natively on Windows and always has; nothing about the mechanism was changed to
+resolve this.
