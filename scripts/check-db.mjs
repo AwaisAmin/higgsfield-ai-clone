@@ -41,6 +41,20 @@ if (users.length === 0) {
   console.log("No users yet — sign up at /sign-up, then re-run this.\n");
 } else {
   const newest = users[0];
+  // The 100-credit assertion only means anything for an account that has not
+  // spent anything yet. Once generations exist a lower balance is correct, so
+  // reporting it as a failure would be noise.
+  if (newest._count.generations > 0) {
+    console.log(
+      `OK — newest user has spent credits across ${newest._count.generations} ` +
+        `generation(s); balance ${newest.credits}. Sign up a fresh account to ` +
+        `re-test the 100-credit grant.
+`,
+    );
+    await prisma.$disconnect();
+    process.exit(0);
+  }
+
   const ok = newest.credits === 100 && newest.plan === "FREE";
   console.log(
     ok

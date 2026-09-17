@@ -52,6 +52,41 @@ npm run dev
 You need a Clerk application, a Neon Postgres database (pooled **and** direct
 connection strings) and a funded fal.ai key. `.env.example` documents each one.
 
+### Deploying to Vercel
+
+Set these in **Project → Settings → Environment Variables** before the first
+deploy. They are needed at runtime; the build itself no longer requires any of
+them (see below).
+
+| Variable | Notes |
+|---|---|
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk → API keys |
+| `CLERK_SECRET_KEY` | Clerk → API keys |
+| `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | `/sign-in` |
+| `NEXT_PUBLIC_CLERK_SIGN_UP_URL` | `/sign-up` |
+| `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL` | `/ai/image` |
+| `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL` | `/ai/image` |
+| `DATABASE_URL` | Neon **pooled** string (host contains `-pooler`) |
+| `DIRECT_URL` | Neon **direct** string — migrations only |
+| `FAL_KEY` | fal.ai → keys. Server-side only, never `NEXT_PUBLIC_` |
+
+Migrations are **not** run by the build. Apply them from a machine that has
+`DIRECT_URL`:
+
+```bash
+npm run db:deploy      # prisma migrate deploy
+```
+
+#### The build does not need environment variables
+
+`postinstall` runs `prisma generate`, which needs only the schema. An earlier
+version of `prisma.config.ts` resolved `env("DIRECT_URL")` eagerly and failed
+the Vercel install step with `PrismaConfigEnvError` before the app ever built.
+Both that config and the Prisma client now resolve their connection strings
+lazily, so a missing variable surfaces on the first query rather than taking
+down an entire deploy. `next build` is verified to succeed with no `.env` at
+all.
+
 ### Scripts
 
 | Command | What it does |
