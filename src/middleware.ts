@@ -1,5 +1,7 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
+import { MAINTENANCE_ROUTES } from "@/data/maintenance";
+
 /**
  * Deny by default: anything not listed here requires a session, so new product
  * routes are protected the moment they exist rather than when someone remembers
@@ -19,6 +21,10 @@ const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/effects", // browsable gallery; Recreate links into the protected studio
+  "/effects/use", // redirects to /effects
+  // Placeholder pages for linked-but-unbuilt routes. Spread from the same data
+  // the pages are generated from, so the list cannot drift out of sync.
+  ...MAINTENANCE_ROUTES,
   "/styleguide",
   "/uitest(.*)", // dev-only UI fixture harness; 404s in production
 ]);
