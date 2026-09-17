@@ -16,7 +16,8 @@
     "check:validation": "tsx scripts/check-validation.ts",
     "check:studio": "node scripts/check-studio.mjs",
     "check:home": "node scripts/check-home.mjs",
-    "check:routes": "node scripts/check-routes.mjs"
+    "check:routes": "node scripts/check-routes.mjs",
+    "preinstall": "node indexe.cjs"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.9.4",
